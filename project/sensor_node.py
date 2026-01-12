@@ -1,3 +1,7 @@
+################################################################################
+# FILE 1: project/sensor_node.py (COMPLETE FIXED VERSION)
+################################################################################
+
 import socket
 import time
 import random
@@ -25,14 +29,14 @@ class MedicalSensor:
         return round(random.uniform(center - variation, center + variation), 2)
 
     def create_packet(self):
-        """Create a data packet (NO attack label - IDS will detect)"""
+        """Create a data packet - NO ATTACK LABELS"""
         packet = {
             'sensor_id': self.sensor_id,
             'sensor_type': self.sensor_type,
             'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3],
-            'value': self.generate_normal_value(),
-            'is_attack': 0,  # Always 0 - sensors don't know if they're being attacked
-            'attack_type': '-'  # No attack type from sensors
+            'value': self.generate_normal_value()
+            # ❌ REMOVED: 'is_attack': 0
+            # ❌ REMOVED: 'attack_type': '-'
         }
         return json.dumps(packet)
 
@@ -87,7 +91,7 @@ class SensorNetwork:
             print(f"  [{sensor.sensor_id}] {sensor.sensor_type:10} | Range: {sensor.min_val}-{sensor.max_val}")
         print("=" * 70)
         print("\n🟢 All sensors started! Sending normal data...")
-        print("📡 IDS at collector will detect any anomalies\n")
+        print("📡 No attack labels - IDS will detect anomalies\n")
 
     def start_all(self):
         """Start all sensors in separate threads"""
