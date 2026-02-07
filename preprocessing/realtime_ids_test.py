@@ -10,7 +10,7 @@ from collections import deque
 # CONFIGURATION
 # ===========================
 WINDOW_SIZE = 60
-THRESHOLD = 0.86
+THRESHOLD = 1
 DATASET_PATH = "medical_iot_ids/processed/final_5sensor_norm.csv"
 MODEL_PATH = "medical_iot_ids/model/lstm_autoencoder.h5"
 SCALER_PATH = "medical_iot_ids/model/scaler.pkl"

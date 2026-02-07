@@ -140,7 +140,7 @@ attack_functions = {
 
 # === NORMAL SAMPLES ===
 print("Creating 500 normal windows...")
-for i in range(500):
+for i in range(1000):
     start = np.random.randint(0, len(data_norm) - WINDOW_SIZE)
     window = data_norm[start:start + WINDOW_SIZE]
     X_test.append(window)
@@ -149,7 +149,7 @@ for i in range(500):
 
 # === ATTACK SAMPLES ===
 print("Creating 500 attack windows (70 of each type)...")
-attacks_per_type = 70
+attacks_per_type = 150
 
 for attack_name, attack_func in attack_functions.items():
     print(f"  Injecting {attack_name}...")
