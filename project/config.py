@@ -24,7 +24,7 @@ else:
 
     # Target IP for attacker (set this to your Windows IP)
     # CHANGE THIS to your Windows IP from ipconfig!
-    TARGET_IP = "10.142.19.250"    # ← CHANGE THIS!
+    TARGET_IP = "10.117.149.250"    # ← CHANGE THIS!
 
 # Port Configuration
 GATEWAY_PORT = 5005  # Sensors send to Gateway
