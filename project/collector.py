@@ -5,9 +5,23 @@ import numpy as np
 import joblib
 from threading import Thread
 from collections import deque
-from flask import Flask, render_template_string
+from flask import Flask, render_template_string, Response
 from tensorflow.keras.models import load_model
 from config import HOST_IP, COLLECTOR_PORT, SENSOR_RANGES, DASHBOARD_PORT
+
+# ======================================================
+# BLOCKCHAIN (added - everything else below is original)
+# ======================================================
+try:
+    from blockchain_logger import BlockchainLogger
+    blockchain = BlockchainLogger()
+    BLOCKCHAIN_ENABLED = blockchain.enabled
+except ImportError:
+    print("⚠️  blockchain_logger.py not found - blockchain logging disabled")
+    BLOCKCHAIN_ENABLED = False
+    blockchain = None
+
+blockchain_stats = {'total_logged': 0, 'last_tx_hash': '-'}
 
 # ======================================================
 # CONFIG
@@ -255,6 +269,19 @@ def udp_receiver():
                     **last_attack_summary
                 })
 
+                # ── BLOCKCHAIN LOG (only addition) ──────────────
+                if BLOCKCHAIN_ENABLED:
+                    tx = blockchain.log_attack(
+                        attack_type      = attack_type,
+                        sensors_affected = last_attack_summary["sensors"],
+                        error_value      = error
+                    )
+                    if tx:
+                        blockchain_stats['total_logged'] += 1
+                        blockchain_stats['last_tx_hash'] = tx
+                        print(f"🔗 Blockchain TX: {tx[:20]}...")
+                # ────────────────────────────────────────────────
+
                 if PENDING_INJECTED > 0:
                     DETECTED_ATTACKS += 1
                     PENDING_INJECTED -= 1
@@ -271,7 +298,7 @@ def udp_receiver():
             print("❌ Collector error:", e)
 
 # ======================================================
-# DASHBOARD (UNCHANGED UI)
+# DASHBOARD
 # ======================================================
 app = Flask(__name__)
 HTML = """<!DOCTYPE html>
@@ -302,14 +329,43 @@ th{color:#8b949e}
 tr.NORMAL{color:#2ea043}
 tr.ATTACK{color:#f85149;background:#2d0f14}
 tr.CALIBRATING{color:#d29922;background:#2d210f}
+/* NEW: blockchain bar */
+.bc-bar{background:#0d1117;border:1px solid #1f6feb;border-radius:10px;
+  padding:9px 16px;margin-bottom:16px;font-size:13px;color:#58a6ff;
+  display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.bc-bar a{color:#79c0ff;font-family:monospace;font-size:12px}
+.bc-off{border-color:#30363d;color:#8b949e}
+/* NEW: csv button */
+.btn-csv{background:#238636;color:#fff;border:none;border-radius:6px;
+  padding:7px 16px;font-size:13px;font-weight:bold;cursor:pointer;
+  text-decoration:none;display:inline-block;margin-right:10px}
+.btn-csv:hover{background:#2ea043}
 </style>
 </head>
 <body>
 
 <div class="section header">
 <h2>🛡️ Medical IoT IDS</h2>
-<div class="status {{ decision }}">{{ decision }}</div>
+<div style="display:flex;align-items:center;gap:10px">
+  <a class="btn-csv" href="/download_csv">⬇ Download CSV</a>
+  <div class="status {{ decision }}">{{ decision }}</div>
 </div>
+</div>
+
+<!-- BLOCKCHAIN BAR (new) -->
+{% if blockchain_enabled %}
+<div class="bc-bar">
+  🔗 <b>BLOCKCHAIN ACTIVE</b> &nbsp;·&nbsp; Ethereum Sepolia
+  &nbsp;·&nbsp; On-Chain Logs: <b>{{ bc_logged }}</b>
+  {% if bc_tx != '-' %}
+    &nbsp;·&nbsp; Last TX:
+    <a href="https://sepolia.etherscan.io/tx/{{ bc_tx }}" target="_blank">{{ bc_tx[:30] }}...</a>
+    <a href="https://sepolia.etherscan.io/tx/{{ bc_tx }}" target="_blank">↗ Etherscan</a>
+  {% endif %}
+</div>
+{% else %}
+<div class="bc-bar bc-off">⚠ Blockchain disabled — add private key to blockchain_logger.py</div>
+{% endif %}
 
 <div class="section kpis">
 <div class="kpi"><span>Total Packets</span><p>{{ total }}</p></div>
@@ -382,10 +438,6 @@ const packets={{ packets|tojson }};
 </body>
 </html>
 """
-# 🔹 HTML REMAINS EXACTLY SAME AS YOUR LAST VERSION
-# (no UI removed, no styling changed)
-
-# --- KEEP YOUR EXISTING HTML STRING HERE ---
 
 @app.route("/")
 def dashboard():
@@ -400,8 +452,26 @@ def dashboard():
         decision=LAST_DECISION,
         packets=list(recent_packets),
         summary=last_attack_summary,
-        history=list(attack_history)
+        history=list(attack_history),
+        # new blockchain vars
+        blockchain_enabled=BLOCKCHAIN_ENABLED,
+        bc_logged=blockchain_stats['total_logged'],
+        bc_tx=blockchain_stats['last_tx_hash'],
     )
+
+# NEW: CSV download
+@app.route("/download_csv")
+def download_csv():
+    import csv, io
+    output = io.StringIO()
+    fields = ['timestamp','sensor_id','sensor_type','value','ids_status','attack_type','ids_error']
+    writer = csv.DictWriter(output, fieldnames=fields, extrasaction='ignore')
+    writer.writeheader()
+    for p in reversed(list(recent_packets)):
+        writer.writerow(p)
+    filename = f"sensor_data_{time.strftime('%Y%m%d_%H%M%S')}.csv"
+    return Response(output.getvalue(), mimetype='text/csv',
+                    headers={'Content-Disposition': f'attachment; filename={filename}'})
 
 if __name__ == "__main__":
     Thread(target=udp_receiver, daemon=True).start()
