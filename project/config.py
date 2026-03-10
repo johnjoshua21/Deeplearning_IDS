@@ -12,7 +12,7 @@
 # ============================================================================
 
 # Network Mode: "localhost" or "network"
-NETWORK_MODE = "localhost"  # Change to "network" for cross-machine attacks
+NETWORK_MODE = "network"  # Change to "network" for cross-machine attacks
 
 # For HOST (Windows) - Sensors, Gateway, Collector
 if NETWORK_MODE == "localhost":
